@@ -4,8 +4,6 @@ Define gene specific parameters to use in the pipeline.
 Duplicate this script with create_config.py
 """
 
-base_output_dir = "outputs"
-
 gene_name = ""
 gene_id = "" #optional - if running multiple genes with long names can use a shorter identifier for folder names 
 
