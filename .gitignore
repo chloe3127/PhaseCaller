@@ -184,3 +184,11 @@ cython_debug/
 #config files
 configs/*.py
 !configs/config_template.py
+
+
+#input files
+input/*
+
+#output
+outputs/*
+.DS_Store

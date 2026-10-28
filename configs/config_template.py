@@ -14,7 +14,7 @@ repeat_motif = "" #e.g. CAAT
 ref_full = "" #full gene sequence
 ref_2_repeats = "" #gene sequence normalised to 2 repeats
 ref_no_repeats = "" #gene sequence from end of repeats to the end of the gene
-ref_gene_start = "" #gene sequence from the start of the gene to the start of the repeats
+ref_gene_start = None #gene sequence from the start of the gene to the start of the repeats - also OPTIONAL if gene start is too short a sequence
 
 ref_gene_end = None #OPTIONAL - define a region at towards the end of the gene, helpful if really long gene and if not None then will BLAST this region as well. Can be compared with gene start searches, may highlight if the gene is being broken up across contigs
 
@@ -27,7 +27,8 @@ reverse_primer = ""
 ref_full = ref_full.upper()
 ref_2_repeats = ref_2_repeats.upper()
 ref_no_repeats = ref_no_repeats.upper()
-ref_gene_start = ref_gene_start.upper()
+if ref_gene_start is not None:
+    ref_gene_start = ref_gene_start.upper()
 if ref_gene_end is not None:
     ref_gene_end = ref_gene_end.upper()
 upstream_flank = upstream_flank.upper()
@@ -43,8 +44,9 @@ flank_buffer = 500 #added to flanking distances to allow some variability - used
 #BLAST search parameters
 gene_blast_params = {
     "min_identity": 80,
-    "high_quality_identity": 90,
+    "high_identity": 90,
     "min_coverage": 70,
+    "high_coverage": 90,
     "max_hits_per_isolate": 10,
     "max_target_seqs": 1000000,
     "max_hsps": 10,
