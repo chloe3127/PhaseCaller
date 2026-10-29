@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 import argparse
 
-from pipeline import pipeline_prep, report_maker, plots
+from pipeline import pipeline_prep, report_maker, plots, sequence_extractor
 from pipeline.blast import blast_parser, blast_runner, blast_prep
 
 
@@ -110,7 +110,15 @@ def main():
 
             blast_results = blast_parser.parse_blast_outputs(blast_outputs, config, contig_id_map)
 
+            extracted_sequences, igr_results = sequence_extractor.extract_sequences(
+                blast_results["gene_hits"],
+                combined_fasta,
+                output_dirs["sequences"],
+                config,
+            )
+
             blast_results["contig_counts"] = contig_counts
+        
 
             report_maker.generate_all_reports(config, blast_results, output_dirs["reports"], isolate_ids)
             plots.plot_raw_blast_results(blast_outputs, config, output_dirs["plots"])

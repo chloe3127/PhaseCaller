@@ -37,6 +37,9 @@ def create_output_dirs(config, base_output_dir):
     if repeat_location.lower() == "promoter": 
         dirs["promoters"] = dirs["sequences"] / "promoters"
 
+    if config.extraction_params.get("extract_igr", False):
+        dirs["igr"] = dirs["sequences"] / "igr"
+
     for directory in dirs.values():
         directory.mkdir(parents=True, exist_ok=True)
 
