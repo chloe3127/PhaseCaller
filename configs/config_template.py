@@ -60,12 +60,28 @@ gene_blast_params = {
 
 gene_start_blast_params = {
     "min_identity": 80,
-    "high_quality_identity": 95,
+    "high_identity": 95,
     "min_coverage": 70,
     "word_size": 7,
     "evalue": 1000,
     "max_hits_per_isolate": 5,
     "max_target_seqs": 1000000,
+}
+
+gene_end_blast_params = {
+    "min_identity": 80,
+    "high_identity": 90,
+    "min_coverage": 70,
+    "high_coverage": 90,
+    "max_hits_per_isolate": 10,
+    "max_target_seqs": 1000000,
+    "max_hsps": 10,
+    "word_size": 11,
+    "reward": 2,
+    "penalty": -3,
+    "gapopen": 5,
+    "gapextend": 2,
+    "evalue": 1e-10
 }
 
 primer_blast_params = {

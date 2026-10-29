@@ -91,7 +91,7 @@ def parse_gene_start_blast(blast_path, config, contig_id_map, params = None):
         params = config.gene_start_blast_params
     gene_start_hits = []
 
-    high_identity = params.get("high_quality_identity", params.get("high_identity", params["min_identity"]))
+    high_identity = params.get("high_identity", params.get("high_identity", params["min_identity"]))
     high_coverage = params.get("high_coverage", params["min_coverage"])
 
     logger.info("Parsing gene start BLAST results with minimum identity %s and coverage %s", params["min_identity"], params["min_coverage"])

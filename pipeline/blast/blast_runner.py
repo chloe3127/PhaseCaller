@@ -69,7 +69,7 @@ def run_gene_start_blast(config, queries, db_path, output_file):
 
 def run_gene_end_blast(config, queries, db_path, output_file):
     #run BLAST search for the end of the gene
-    params = config.gene_blast_params
+    params = config.gene_end_blast_params
     search_name = f"{config.gene_name} gene end BLAST"
 
     cmd = [
