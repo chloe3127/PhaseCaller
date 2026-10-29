@@ -110,20 +110,14 @@ def main():
 
             blast_results = blast_parser.parse_blast_outputs(blast_outputs, config, contig_id_map)
 
-            extracted_sequences, igr_results = sequence_extractor.extract_sequences(
-                blast_results["gene_hits"],
-                combined_fasta,
-                output_dirs["sequences"],
-                config,
-            )
+            extracted_sequences, igr_results, before_N_filtering = sequence_extractor.extract_sequences(blast_results["gene_hits"], combined_fasta, output_dirs["sequences"], config)
 
             blast_results["contig_counts"] = contig_counts
         
 
-            report_maker.generate_all_reports(config, blast_results, output_dirs["reports"], isolate_ids)
-            plots.plot_raw_blast_results(blast_outputs, config, output_dirs["plots"])
-            plots.plot_raw_blast_results(blast_outputs, config, output_dirs["plots"])
-            plots.plot_primer_mismatch(blast_outputs, config, output_dirs["plots"])
+            report_maker.generate_all_reports(config, blast_results, output_dirs["reports"], isolate_ids, blast_outputs, extracted_sequences, before_N_filtering)
+            plots.generate_all_plots(config, blast_outputs, extracted_sequences, before_N_filtering, output_dirs["plots"])
+
 
 
 

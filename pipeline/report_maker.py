@@ -627,20 +627,131 @@ def create_blast_summary_report(blast_results, config, isolate_ids, output_dir):
     logger.info("BLAST summary report saved to %s", output_path)
     return output_path
 
+#2 - Sequence extraction report
+def make_extraction_table(sequences, kept_sequences, config):
+    promoter_mode = config.repeat_location.lower() == "promoter"
+    columns = [
+        "id", "gene_copy", "contig",
+        "N_filter", "sequence_N_count", "boundary_status", "blast_query",
+        "genomic_context", "contig_length", "gene_start", "gene_end",
+        "extract_start", "extract_end", "extracted_length",
+        "dist_to_contig_start", "dist_to_contig_end", "strand", "flags"
+    ]
+    if promoter_mode:
+        columns.extend([
+            "promoter_length_requested", "promoter_length_extracted",
+            "promoter_start", "promoter_end", "promoter_N_count"
+        ])
 
+    rows = []
+    for s in sequences:
+        key = (s["isolate_id"], s["gene_copy"], s["contig_id"])
+        row = {
+            "id": s["isolate_id"],
+            "gene_copy": s["gene_copy"],
+            "contig": s.get("original_contig_id", s["contig_id"]),
+            "N_filter": "Kept" if key in kept_sequences else "Removed",
+            "sequence_N_count": s["sequence"].upper().count("N"),
+            "boundary_status": s["boundary_status"],
+            "blast_query": s.get("blast_query", "unknown"),
+            "genomic_context": s.get("genomic_context", "unknown"),
+            "contig_length": s["contig_length"],
+            "gene_start": s["gene_start"],
+            "gene_end": s["gene_end"],
+            "extract_start": s["extract_start"],
+            "extract_end": s["extract_end"],
+            "extracted_length": len(s["sequence"]),
+            "dist_to_contig_start": s["dist_to_contig_start"],
+            "dist_to_contig_end": s["dist_to_contig_end"],
+            "strand": s["strand"],
+            "flags": "; ".join(s.get("flags") or [])
+        }
+        if promoter_mode:
+            row.update({
+                "promoter_length_requested": s["promoter_length_requested"],
+                "promoter_length_extracted": s["promoter_length_extracted"],
+                "promoter_start": s["promoter_start"],
+                "promoter_end": s["promoter_end"],
+                "promoter_N_count": (s.get("promoter_sequence") or "").upper().count("N")
+            })
+        rows.append(row)
 
+    return sort_report_df_by_id(pd.DataFrame(rows, columns = columns))
 
+def create_sequence_extraction_report(before_N_filtering, extracted_sequences, config, output_dir):
+    gene_name = config.gene_name
+    params = config.extraction_params
+    promoter_mode = config.repeat_location.lower() == "promoter"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents = True, exist_ok = True)
+    output_path = output_dir / f"{gene_name}_sequence_extraction.xlsx"
 
+    logger.info("Creating sequence extraction report for gene: %s", gene_name)
 
+    kept_sequences = {
+        (s["isolate_id"], s["gene_copy"], s["contig_id"])
+        for s in extracted_sequences
+    }
+    before_df = make_extraction_table(before_N_filtering, kept_sequences, config)
+    after_df = make_extraction_table(extracted_sequences, kept_sequences, config)
+    removed_df = before_df[before_df["N_filter"] == "Removed"]
 
+    parameter_rows = [
+        ("Gene name", gene_name),
+        ("Repeat location", config.repeat_location),
+        ("Flanking bp used", 0 if promoter_mode else params["flanking_bp"]),
+        ("Critical boundary distance (bp)", params["boundary_critical_distance"]),
+        ("Warning boundary distance (bp)", params["boundary_warning_distance"]),
+        ("Coordinate system", "0-based, end-exclusive"),
+        ("Boundary assessment", "BLAST hit boundaries"),
+        ("N filter scope", "Gene sequence only; promoter excluded" if promoter_mode else "Entire extracted sequence including flanks")
+    ]
+    if promoter_mode:
+        parameter_rows.append(("Promoter length (bp)", params["promoter_length"]))
+    parameter_df = pd.DataFrame(parameter_rows, columns = ["Parameter", "Value"])
 
+    n_before = len(before_df)
+    n_removed = len(removed_df)
+    totals_df = pd.DataFrame([
+        ("Loci before N filtering", n_before),
+        ("Loci after N filtering", len(after_df)),
+        ("Loci removed by N filtering", n_removed),
+        ("Percentage removed", round(n_removed / n_before * 100, 2) if n_before else 0)
+    ], columns = ["Metric", "Value"])
 
+    boundary_df = pd.DataFrame([
+        {
+            "Boundary status": status,
+            "Before N filtering": sum(s["boundary_status"] == status for s in before_N_filtering),
+            "After N filtering": sum(s["boundary_status"] == status for s in extracted_sequences)
+        }
+        for status in ["OK", "WARNING", "CRITICAL"]
+    ])
 
+    with pd.ExcelWriter(output_path, engine = "openpyxl") as writer:
+        parameter_df.to_excel(writer, sheet_name = "Extraction Parameters", index = False)
+        current_row = write_df_with_spacing(totals_df, writer, "Extraction Summary", 0)
+        write_df_with_spacing(boundary_df, writer, "Extraction Summary", current_row)
+        before_df.to_excel(writer, sheet_name = "Before N Filtering", index = False)
+        after_df.to_excel(writer, sheet_name = "After N Filtering", index = False)
+        removed_df.to_excel(writer, sheet_name = "Removed by N Filtering", index = False)
+        format_workbook(writer)
+
+        #summary contains two separate tables, so remove the worksheet-wide filter
+        writer.book["Extraction Summary"].auto_filter.ref = None
+
+    logger.info("Sequence extraction report saved to %s", output_path)
+    return output_path
 #one function to make all reports 
 
-def generate_all_reports(config, blast_results, output_dir, isolate_ids):
+def generate_all_reports(config, blast_results, output_dir, isolate_ids, blast_outputs, extracted_sequences, before_N_filtering):
+    output_dir = Path(output_dir)
+    gene_name = config.gene_name
     reports_generated = {
-        "blast_summmary": create_blast_summary_report(blast_results, config, isolate_ids, output_dir)
+        "gene_hits": report_gene_hit_stats(blast_outputs["gene"], output_dir / f"{gene_name}_gene_hit_stats.txt"),
+        "flank_hits": report_flank_hit_stats(blast_outputs["gene"], output_dir / f"{gene_name}_flank_hit_stats.txt"),
+        "blast_summmary": create_blast_summary_report(blast_results, config, isolate_ids, output_dir),
+        "sequence_extraction": create_sequence_extraction_report(before_N_filtering, extracted_sequences, config, output_dir)
     }
 
     return reports_generated

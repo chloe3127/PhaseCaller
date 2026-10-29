@@ -284,6 +284,55 @@ def write_igr_fastas(upstream_igrs, downstream_igrs, output_dir, config):
         SeqIO.write(records, path, "fasta")
         logger.info(f"Wrote {len(records)} {igr_type} IGR sequences to {path}")
 
+def write_multicopy_fastas(sequences, output_dir, config):
+    #group retained loci by isolate
+    sequences_by_isolate = {}
+    for seq in sequences:
+        sequences_by_isolate.setdefault(seq["isolate_id"], []).append(seq)
+
+    multicopy_isolates = {
+        isolate_id: copies
+        for isolate_id, copies in sequences_by_isolate.items()
+        if len(copies) > 1
+    }
+    if not multicopy_isolates:
+        logger.info("No isolates with multiple retained gene copies")
+        return None
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents = True, exist_ok = True)
+    all_records = []
+
+    for isolate_id, copies in multicopy_isolates.items():
+        records = []
+        for seq in copies:
+            header_parts = [
+                f"isolate_id={seq['isolate_id']}",
+                f"copy={seq['gene_copy']}",
+                f"contig={seq['contig_id']}",
+                f"coords={seq['extract_start']}-{seq['extract_end']}",
+                "coordinate_system=0-based_end-exclusive",
+                f"strand={seq['strand']}",
+                f"boundary_status={seq['boundary_status']}"
+            ]
+            records.append(SeqRecord(
+                Seq(seq["sequence"]),
+                id = f"{seq['isolate_id']}_{seq['gene_copy']}",
+                description = " ".join(header_parts)
+            ))
+
+        path = output_dir / f"{config.gene_name}_{isolate_id}_multicopy.fasta"
+        SeqIO.write(records, path, "fasta")
+        all_records.extend(records)
+
+    combined_path = output_dir / f"{config.gene_name}_multicopy_all_sequences.fasta"
+    SeqIO.write(all_records, combined_path, "fasta")
+    logger.info(
+        "Saved %d retained loci from %d multicopy isolates to %s",
+        len(all_records), len(multicopy_isolates), output_dir
+    )
+    return combined_path
+
 def extract_sequences(blast_results, genome_dir, output_dir, config):
     #extract sequences for all BLAST hits with QC
     extraction_params = config.extraction_params
@@ -327,7 +376,7 @@ def extract_sequences(blast_results, genome_dir, output_dir, config):
             "isolate_id": hit["isolate_id"],
             "gene_copy": hit["gene_copy"],
             "contig_id": contig_id,
-            "original_contig_id": hit.get("contig_original", contig_id),
+            "original_contig_id": hit.get("contig_orig", contig_id),
             "blast_identity": hit["identity"],
             "blast_coverage": hit["coverage"],
             "sequence": seq_data["sequence"],
@@ -363,7 +412,9 @@ def extract_sequences(blast_results, genome_dir, output_dir, config):
     write_extracted_fasta(extracted, output_dir, config)
     if repeat_location == "promoter":
         write_promoter_fastas(extracted, output_dir, config)
+    write_multicopy_fastas(extracted, output_dir / "multicopy", config)
 
+    before_N_filtering = extracted
     extracted = remove_ambiguous_bases(extracted)
 
     boundary_counts = {}
@@ -408,4 +459,4 @@ def extract_sequences(blast_results, genome_dir, output_dir, config):
         write_igr_fastas(upstream_igrs, downstream_igrs, Path(output_dir) / "igr", config)
         logger.info(f"IGR extraction complete: {len(upstream_igrs)} upstream, {len(downstream_igrs)} downstream IGRs")
 
-    return extracted, {"upstream": upstream_igrs, "downstream": downstream_igrs}
+    return extracted, {"upstream": upstream_igrs, "downstream": downstream_igrs}, before_N_filtering
